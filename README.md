@@ -68,12 +68,10 @@ range(values(d[["sq_config"]]), na.rm = TRUE)   # exactly zero
 # how the components respond to scale
 ss_scale_profile(z1, z2, metrics = c("sq", "sr1"), w_seq = c(5, 11, 21, 31))
 
-# decomposed change in buffers around field sites
-# `pts` may be a data.frame with x/y columns, an sf object, or a SpatVector
-set.seed(1)
-pts <- data.frame(id = 1:6,
-                  x  = runif(6, xmin(z1) + 600, xmax(z1) - 600),
-                  y  = runif(6, ymin(z1) + 600, ymax(z1) - 600))
+# decomposed change in buffers around field sites.
+# `sites.csv` ships with the package; you can also pass your own data.frame
+# with x/y columns, an sf object, or a SpatVector.
+pts <- read.csv(system.file("extdata", "sites.csv", package = "surfscape"))
 ss_extract(d, pts, radii = c(150, 300, 600))
 ```
 

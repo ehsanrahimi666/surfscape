@@ -158,11 +158,8 @@ point locations at several radii, returning a tidy long table ready for
 multi-scale modelling.
 
 ```{r extract}
-set.seed(1)
-pts <- data.frame(
-  id = 1:6,
-  x  = runif(6, xmin(z1) + 600, xmax(z1) - 600),
-  y  = runif(6, ymin(z1) + 600, ymax(z1) - 600))
+pts <- read.csv(system.file("extdata", "sites.csv", package = "surfscape"))
+head(pts, 3)
 e <- ss_extract(d, pts, radii = c(150, 300, 600))
 head(e, 10)
 ```
