@@ -1,0 +1,184 @@
+---
+title: "Decomposing structural change in continuous landscapes"
+author: "surfscape"
+output:
+  pdf_document:
+    toc: true
+    number_sections: true
+    fig_width: 7
+    fig_height: 3.0
+  rmarkdown::html_vignette: default
+vignette: >
+  %\VignetteIndexEntry{Decomposing structural change in continuous landscapes}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", dpi = 120,
+                      fig.align = "center", warning = FALSE, message = FALSE)
+```
+
+# The problem this package solves
+
+Landscape ecology separates **composition** (how much of what is present) from
+**configuration** (how it is arranged in space). That distinction is the
+backbone of patch-based analysis. When landscapes are represented as continuous
+surfaces instead of patch mosaics, the distinction was never carried across.
+
+Most of the metrics used on continuous surfaces are functions of the *multiset*
+of values in the analysis neighbourhood: the amplitude family of surface
+metrics (`Sa`, `Sq`, `Ssk`, `Sku`, `S10z`), the surface-bearing family derived
+from the Abbott curve (`Sbi`, `Sci`, `Svi`, `Sk`, `Spk`, `Svk`), and the
+information-theoretic measures (Shannon entropy, Rao's quadratic entropy).
+Rearranging every pixel inside the neighbourhood leaves them numerically
+unchanged. They cannot detect a change in spatial structure, in any landscape,
+at any scale.
+
+`surfscape` provides two things: a test that establishes this for any metric,
+and a decomposition that separates the part of an observed change that is due
+to the value distribution from the part that is due to spatial arrangement.
+
+```{r load}
+library(terra)
+library(surfscape)
+
+z1 <- rast(system.file("extdata", "ndvi_2013.tif", package = "surfscape"))
+z2 <- rast(system.file("extdata", "ndvi_2023.tif", package = "surfscape"))
+c(mean_2013 = global(z1, "mean", na.rm = TRUE)[1, 1],
+  mean_2023 = global(z2, "mean", na.rm = TRUE)[1, 1])
+```
+
+```{r plot-data, fig.height = 2.8}
+par(mfrow = c(1, 3), mar = c(1, 1, 2, 3))
+plot(z1, axes = FALSE, main = "NDVI 2013")
+plot(z2, axes = FALSE, main = "NDVI 2023")
+plot(z2 - z1, axes = FALSE, main = "difference",
+     col = hcl.colors(100, "Blue-Red 3"))
+```
+
+# Which metrics can see arrangement?
+
+`ss_sensitivity()` samples neighbourhoods, permutes the values inside each one,
+and compares the observed metric with its permuted values. The permutation
+preserves the value multiset exactly, so a metric that depends only on that
+multiset is invariant.
+
+```{r sens}
+s <- ss_sensitivity(z1, w = 15, n = 400, nperm = 49, seed = 1)
+s[, c("metric", "family", "arrangement", "csi", "effect")]
+```
+
+Two columns answer two different questions. `arrangement` states whether a
+metric *can* respond to configuration as a matter of construction. `csi`, the
+configurational sensitivity index, states how much it *does* respond in this
+particular landscape: it is `1 - R^2` of the observed metric regressed on its
+permutation mean, so zero means arrangement contributes nothing.
+
+Metrics from other packages can be audited on exactly the same footing with
+`ss_sensitivity_fun()`, which takes any function of a neighbourhood matrix.
+
+```{r sens-fun}
+f <- function(m) {
+  v <- as.numeric(m)
+  d <- v - mean(v)
+  c(sd            = sqrt(mean(d^2)),
+    skewness      = mean(d^3) / mean(d^2)^1.5,
+    shannon       = {p <- table(cut(v, 16)) / length(v); p <- p[p > 0]
+                     -sum(p * log(p))},
+    mean_sq_diff  = mean((m[, -ncol(m)] - m[, -1])^2))
+}
+ss_sensitivity_fun(z1, f, w = 15, n = 120, nperm = 19, seed = 1)
+```
+
+The first three are invariant to machine precision; only the last responds to
+how the values are arranged.
+
+# Decomposing change
+
+`ss_decompose()` splits the change in a metric between two dates into three
+additive components:
+
+* **global** -- the landscape-wide value distribution shifted;
+* **local** -- values were redistributed among neighbourhoods;
+* **config** -- values were rearranged *within* neighbourhoods.
+
+The three sum exactly to the total change. The global component uses a rank
+transfer between the two dates (`ss_rank_transfer()`), which keeps one date's
+spatial arrangement and gives it the other date's value distribution; the split
+is symmetrised over both orderings so that it does not depend on which date is
+taken first.
+
+```{r decomp}
+d <- ss_decompose(z1, z2, metrics = c("sq", "sent", "sr1", "gcon"), w = 15)
+names(d)
+```
+
+Additivity is exact, not approximate:
+
+```{r additivity}
+v <- values(d[[c("sr1_total", "sr1_global", "sr1_local", "sr1_config")]])
+max(abs(v[, 1] - rowSums(v[, 2:4])), na.rm = TRUE)
+```
+
+For an aspatial metric the configuration component is exactly zero everywhere,
+which is the point:
+
+```{r zero-config}
+range(values(d[["sq_config"]]), na.rm = TRUE)
+range(values(d[["sent_config"]]), na.rm = TRUE)
+```
+
+```{r decomp-plot, fig.height = 2.8}
+par(mfrow = c(1, 3), mar = c(1, 1, 2, 3))
+for (k in c("sr1_total", "sr1_local", "sr1_config")) {
+  r <- d[[k]]
+  mx <- max(abs(quantile(values(r), c(.02, .98), na.rm = TRUE)))
+  plot(clamp(r, -mx, mx, values = TRUE), axes = FALSE, main = k,
+       range = c(-mx, mx), col = hcl.colors(100, "Blue-Red 3"))
+}
+```
+
+# How the components scale
+
+Composition and configuration do not respond to window size in the same way, so
+the scale of analysis changes not only the magnitude of a result but which
+process it is attributed to.
+
+```{r scale}
+sp <- ss_scale_profile(z1, z2, metrics = c("sq", "sr1"),
+                       w_seq = c(5, 11, 21, 31))
+sp
+```
+
+# Field sites
+
+`ss_extract()` summarises the decomposed change in circular buffers around
+point locations at several radii, returning a tidy long table ready for
+multi-scale modelling.
+
+```{r extract}
+set.seed(1)
+pts <- data.frame(
+  id = 1:6,
+  x  = runif(6, xmin(z1) + 600, xmax(z1) - 600),
+  y  = runif(6, ymin(z1) + 600, ymax(z1) - 600))
+e <- ss_extract(d, pts, radii = c(150, 300, 600))
+head(e, 10)
+```
+
+# Practical notes
+
+* Always pass the same `range` to both dates when metrics involve binning
+  (`sent`, `srao`, and the GLCM family). `ss_decompose()` does this for you.
+* `csi` is landscape-specific; `arrangement` is not. A metric with
+  `arrangement = TRUE` but a low `csi` is formally able to see configuration but
+  carries little configurational information in the data at hand.
+* The decomposition is an algebraic identity, so it is exact for any metric,
+  including metrics supplied by other packages through the rank-transfer route.
+* Large rasters are processed block-wise; results are identical to an in-memory
+  pass.
+
+```{r session}
+sessionInfo()
+```
