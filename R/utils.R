@@ -116,7 +116,7 @@ ss_rank_transfer <- function(arrangement, values) {
   names(out) <- out_names
 
   for (x in xlist) terra::readStart(x)
-  on.exit(for (x in xlist) try(terra::readStop(x), silent = TRUE), add = TRUE)
+  on.exit(for (x in xlist) terra::readStop(x), add = TRUE)
 
   bt <- terra::writeStart(out, filename = filename, overwrite = overwrite,
                           wopt = wopt)

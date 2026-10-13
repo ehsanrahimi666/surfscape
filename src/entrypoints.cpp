@@ -61,7 +61,7 @@ NumericMatrix ss_focal_metrics_cpp(NumericVector z, int nrow, int ncol,
 /*
  * Within-window decomposition of change.
  *
- * For each focal cell the two dated windows W1 and W2 are gathered and two
+ * For each cell the two dated windows W1 and W2 are gathered and two
  * counterfactual windows are built by rank transfer:
  *   A = arrangement of W2 with the value multiset of W1
  *   B = arrangement of W1 with the value multiset of W2
@@ -117,27 +117,27 @@ NumericMatrix ss_decompose_cpp(NumericVector z1, NumericVector z2,
 }
 
 /*
- * Configurational sensitivity audit.
+ * Spatial permutation test at sampled windows.
  *
- * Windows are sampled on a regular stride. For each sampled window the metric
- * is evaluated on the observed arrangement and on `nperm` random permutations
- * of the same values. Columns per metric: observed, permutation mean,
- * permutation sd.
+ * For each sampled window the metrics are evaluated on the observed window
+ * and on `nperm` random permutations of its values. The result has
+ * (1 + nperm) * ns rows: the first ns rows hold the observed values and each
+ * following block of ns rows holds one permutation. Windows that touch the
+ * raster edge or contain a missing value return NA.
  */
 // [[Rcpp::export]]
-NumericMatrix ss_sensitivity_cpp(NumericVector z, int nrow, int ncol,
-                                 int wr, int wc, IntegerVector mids,
-                                 IntegerVector cells, int nperm, List pars) {
+NumericMatrix ss_permute_cpp(NumericVector z, int nrow, int ncol,
+                             int wr, int wc, IntegerVector mids,
+                             IntegerVector cells, int nperm, List pars) {
   const SSPars p = make_pars(pars);
   const std::vector<int> ids(mids.begin(), mids.end());
   const int nm = ids.size(), k = wr * wc;
   const int hr = wr / 2, hc = wc / 2;
   const int ns = cells.size();
-  NumericMatrix out(ns, 3 * nm);
+  NumericMatrix out((R_xlen_t) (1 + nperm) * ns, nm);
   std::fill(out.begin(), out.end(), NA_REAL);
 
-  std::vector<double> buf(k), perm(k);
-  std::vector<double> obs(nm), tmp(nm), acc(nm), acc2(nm);
+  std::vector<double> buf(k), perm(k), res(nm);
 
   for (int s = 0; s < ns; ++s) {
     Rcpp::checkUserInterrupt();
@@ -145,31 +145,54 @@ NumericMatrix ss_sensitivity_cpp(NumericVector z, int nrow, int ncol,
     const int r = (int) (idx / ncol), c = (int) (idx % ncol);
     if (!gather(z, nrow, ncol, r, c, hr, hc, buf)) continue;
 
-    ss_window_metrics(buf.data(), wr, wc, ids, p, obs.data());
-    std::fill(acc.begin(), acc.end(), 0.0);
-    std::fill(acc2.begin(), acc2.end(), 0.0);
-    std::vector<int> cnt(nm, 0);
+    ss_window_metrics(buf.data(), wr, wc, ids, p, res.data());
+    for (int m = 0; m < nm; ++m) out(s, m) = res[m];
 
-    for (int b = 0; b < nperm; ++b) {
+    for (int b = 1; b <= nperm; ++b) {
       perm = buf;
       for (int i = k - 1; i > 0; --i) {
         const int j = (int) (unif_rand() * (i + 1));
         std::swap(perm[i], perm[j]);
       }
-      ss_window_metrics(perm.data(), wr, wc, ids, p, tmp.data());
-      for (int m = 0; m < nm; ++m)
-        if (!ISNAN(tmp[m])) { acc[m] += tmp[m]; acc2[m] += tmp[m] * tmp[m]; cnt[m]++; }
+      ss_window_metrics(perm.data(), wr, wc, ids, p, res.data());
+      const R_xlen_t row = (R_xlen_t) b * ns + s;
+      for (int m = 0; m < nm; ++m) out(row, m) = res[m];
     }
-    for (int m = 0; m < nm; ++m) {
-      out(s, m) = obs[m];
-      if (cnt[m] > 1) {
-        const double mu = acc[m] / cnt[m];
-        double v = acc2[m] / cnt[m] - mu * mu;
-        if (v < 0.0) v = 0.0;
-        out(s, nm + m)     = mu;
-        out(s, 2 * nm + m) = std::sqrt(v);
-      }
+  }
+  return out;
+}
+
+/*
+ * Metrics computed over the whole raster treated as a single window, on the
+ * observed arrangement (first row) and on `nperm` random permutations of all
+ * cells (following rows). The raster must not contain missing values.
+ */
+// [[Rcpp::export]]
+NumericMatrix ss_whole_cpp(NumericVector z, int nrow, int ncol,
+                           IntegerVector mids, int nperm, List pars) {
+  const SSPars p = make_pars(pars);
+  const std::vector<int> ids(mids.begin(), mids.end());
+  const int nm = ids.size();
+  const R_xlen_t k = (R_xlen_t) nrow * ncol;
+  NumericMatrix out(1 + nperm, nm);
+  std::fill(out.begin(), out.end(), NA_REAL);
+
+  std::vector<double> buf(z.begin(), z.end()), res(nm);
+  for (R_xlen_t i = 0; i < k; ++i) if (ISNAN(buf[i])) return out;
+
+  ss_window_metrics(buf.data(), nrow, ncol, ids, p, res.data());
+  for (int m = 0; m < nm; ++m) out(0, m) = res[m];
+
+  std::vector<double> perm(k);
+  for (int b = 1; b <= nperm; ++b) {
+    Rcpp::checkUserInterrupt();
+    perm = buf;
+    for (R_xlen_t i = k - 1; i > 0; --i) {
+      const R_xlen_t j = (R_xlen_t) (unif_rand() * (i + 1));
+      std::swap(perm[i], perm[j]);
     }
+    ss_window_metrics(perm.data(), nrow, ncol, ids, p, res.data());
+    for (int m = 0; m < nm; ++m) out(b, m) = res[m];
   }
   return out;
 }

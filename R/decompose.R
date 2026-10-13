@@ -1,10 +1,10 @@
 #' Decompose change in a continuous landscape surface
 #'
-#' Splits the change in any continuous landscape metric between two dates into
-#' three additive components: a shift in the landscape-wide value distribution,
-#' a spatial redistribution of values among neighbourhoods, and a rearrangement
-#' of values within neighbourhoods. The three components sum exactly to the
-#' observed change at every cell.
+#' Splits the change in a moving-window landscape metric between two dates
+#' into three additive components: a change in the landscape-wide value
+#' distribution, a redistribution of values among landscape windows, and a
+#' rearrangement of values within windows. The three components sum to the
+#' observed change at every cell, up to floating-point rounding.
 #'
 #' @param z1,z2 Single-layer `SpatRaster` objects for the two dates, with
 #'   identical geometry. Cells missing in either date are dropped from both.
@@ -22,30 +22,45 @@
 #'   `<metric>_<component>`.
 #'
 #' @section The decomposition:
-#' Let \eqn{M} be a metric evaluated on a neighbourhood, \eqn{W_1} and
-#' \eqn{W_2} the neighbourhood at the two dates, and let \eqn{A} denote the
-#' rank transfer that keeps one arrangement and substitutes the other value
-#' multiset. Symmetrising over the two possible orderings (the two-factor
-#' Shapley solution) gives
+#' For every window, the change in a metric between the two dates is split
+#' into three parts that add up to the total change:
+#' \describe{
+#'   \item{global}{the part due to the change in the landscape-wide value
+#'     distribution;}
+#'   \item{local}{the part due to values moving between windows, so that a
+#'     window contains a different set of values even when the landscape-wide
+#'     distribution is unchanged;}
+#'   \item{config}{the part due to the rearrangement of values inside the
+#'     window.}
+#' }
+#' The components are obtained from counterfactual surfaces built by rank
+#' transfer (see [ss_rank_transfer()]), which keeps the spatial ordering of
+#' values of one date and gives it the values of the other date. Inside each
+#' window, rank transfer between the two dated windows separates the change
+#' due to the window's values (marginal part) from the change due to their
+#' arrangement (`config`). Over the whole landscape, rank transfer between the
+#' two dated surfaces gives the change due to the landscape-wide distribution
+#' (`global`), and `local` is the marginal part minus `global`. Each
+#' counterfactual comparison is averaged over the two possible orderings of
+#' the dates (the two-factor Shapley value), so the result does not depend on
+#' which date is taken first; where composition and configuration change
+#' together, their interaction is shared equally between the components.
+#' The formulas are given in the package vignette.
 #'
-#' \deqn{\Delta M = \underbrace{\Delta_{\mathrm{global}}}_{\text{distribution}}
-#'  + \underbrace{\Delta_{\mathrm{local}}}_{\text{redistribution}}
-#'  + \underbrace{\Delta_{\mathrm{config}}}_{\text{arrangement}}}
+#' Two limiting cases follow exactly from this construction. If the second
+#' date is a strictly increasing transformation of the first, the spatial
+#' ordering of values is unchanged everywhere and the `config` and `local`
+#' components are zero. If the two dates contain the same values in a
+#' different arrangement, the landscape-wide distribution is unchanged and
+#' the `global` component is zero, while the `local` and `config`
+#' components are generally not zero because values have moved between and
+#' within windows.
 #'
-#' where the arrangement component is obtained by transferring ranks *within*
-#' each window, the global component by transferring ranks over the *whole*
-#' landscape, and the local component as the remainder. The identity holds
-#' exactly, not approximately: if the two dates differ only by a monotone
-#' transformation of values the arrangement and local components are exactly
-#' zero, and if they share an identical value multiset the global component is
-#' exactly zero.
+#' For a metric that depends only on the values present in the window (a
+#' compositional metric, see [ss_benchmark()]) the `config` component is zero
+#' at every cell and at every window size.
 #'
-#' For every metric with `arrangement = FALSE` in [ss_metric_list()] the
-#' configurational component is exactly zero by construction, at every scale.
-#' That is the point: such metrics cannot detect spatial rearrangement, however
-#' large it is.
-#'
-#' @seealso [ss_sensitivity()] to audit a metric before using it,
+#' @seealso [ss_benchmark()] to classify a metric before using it,
 #'   [ss_scale_profile()] to run the decomposition across scales.
 #'
 #' @examples
@@ -124,10 +139,8 @@ ss_decompose <- function(z1, z2, metrics = c("sq", "sr1"), w = 7,
 
 #' Scale profile of decomposed landscape change
 #'
-#' Runs [ss_decompose()] over a ladder of window sizes and summarises how the
-#' three components of change scale. The scale at which the configurational
-#' component peaks answers a question the total change cannot: at what grain
-#' did the landscape actually rearrange.
+#' Runs [ss_decompose()] over a series of window sizes and summarises how the
+#' three components of change vary with the size of the landscape window.
 #'
 #' @inheritParams ss_decompose
 #' @param w_seq Vector of odd window sizes in cells.
@@ -135,12 +148,19 @@ ss_decompose <- function(z1, z2, metrics = c("sq", "sr1"), w = 7,
 #'   are returned alongside the summary.
 #' @param progress Logical, print progress.
 #'
-#' @return A `data.frame` with one row per window size and metric, containing
-#'   the mean absolute magnitude of each component, the configurational share,
-#'   the correlation between components across cells, and the proportion of
-#'   cells where the sign of the total change differs from the sign of the
-#'   configurational change. When `rasters = TRUE`, a list with elements
-#'   `summary` and `rasters`.
+#' @return A `data.frame` with one row per window size and metric: `n`
+#'   (cells), the mean absolute value of the total change and of each
+#'   component (`mad_*`), `share_config`, the mean absolute configurational
+#'   component divided by the sum of the mean absolute values of the three
+#'   components, the correlations across cells between the compositional
+#'   (global plus local) and configurational components (`r_comp_config`) and
+#'   between the total change and the configurational component
+#'   (`r_total_config`), and `sign_disagree`, the proportion of cells with a
+#'   non-zero configurational component whose sign differs from that of the
+#'   total change. Correlations are `NA` when a component is constant, and
+#'   `sign_disagree` is `NA` when the configurational component is zero
+#'   everywhere. When `rasters = TRUE`, a list with elements `summary` and
+#'   `rasters`.
 #'
 #' @examples
 #' set.seed(1)
@@ -174,25 +194,118 @@ ss_scale_profile <- function(z1, z2, metrics = c("sq", "sr1"),
       if (!nrow(v)) next
       tot <- v[, 1]; gl <- v[, 2]; lo <- v[, 3]; cf <- v[, 4]
       comp <- gl + lo
+      tolc <- 1e-12 * max(abs(tot))
+      keep <- abs(cf) > tolc
       out[[length(out) + 1L]] <- data.frame(
         w = w, metric = m, n = nrow(v),
         mad_total = mean(abs(tot)),
         mad_global = mean(abs(gl)),
         mad_local = mean(abs(lo)),
         mad_config = mean(abs(cf)),
-        share_config = mean(abs(cf)) / (mean(abs(comp)) + mean(abs(cf))),
-        r_comp_config = suppressWarnings(stats::cor(comp, cf)),
-        r_total_config = suppressWarnings(stats::cor(tot, cf)),
-        sign_disagree = {
-          tolc <- 1e-12 * max(abs(tot), na.rm = TRUE)
-          keep <- abs(cf) > tolc
-          if (!any(keep)) NA_real_ else
-            mean(sign(tot[keep]) != sign(cf[keep]))
-        },
+        share_config = mean(abs(cf)) /
+          (mean(abs(gl)) + mean(abs(lo)) + mean(abs(cf))),
+        r_comp_config = .ss_cor(comp, cf),
+        r_total_config = .ss_cor(tot, cf),
+        sign_disagree = if (any(keep))
+          mean(sign(tot[keep]) != sign(cf[keep])) else NA_real_,
         stringsAsFactors = FALSE)
     }
     if (progress) message("scale ", w, " done")
   }
   s <- do.call(rbind, out)
   if (rasters) list(summary = s, rasters = rs) else s
+}
+
+#' Pearson correlation, NA when either variable is constant
+#' @keywords internal
+#' @noRd
+.ss_cor <- function(a, b) {
+  if (stats::sd(a) == 0 || stats::sd(b) == 0) return(NA_real_)
+  stats::cor(a, b)
+}
+
+#' Decompose change in landscape-level metrics
+#'
+#' Splits the change in metrics computed over the whole surface between two
+#' dates into a compositional component, due to the change in the value
+#' distribution, and a configurational component, due to the change in the
+#' spatial arrangement of values. At this level the landscape window is the
+#' whole surface, so the local component of [ss_decompose()] does not arise.
+#'
+#' @param z1,z2 Single-layer `SpatRaster` objects for the two dates, with
+#'   identical geometry and no missing values.
+#' @param metrics Built-in metric names, see [ss_metric_list()].
+#' @param fun Alternatively, a function that takes a `SpatRaster` and returns
+#'   a named numeric vector, for metrics implemented elsewhere.
+#' @param range,nbins,nlevels,lacbox Settings of the built-in metrics, see
+#'   [ss_metrics()]. `range` defaults to the joint range of both dates.
+#'
+#' @return A `data.frame` with one row per metric: the values at both dates
+#'   (`value1`, `value2`), `total` change, `composition` and `configuration`
+#'   components (which sum to `total`), and `share_config`, the absolute
+#'   configurational component divided by the sum of the absolute values of
+#'   both components.
+#'
+#' @details
+#' The components are averages over the two orderings of the dates of the
+#' differences between the observed surfaces and the rank-transfer
+#' counterfactuals (one date's arrangement with the other date's values), as
+#' in [ss_decompose()]. If the second date is a strictly increasing
+#' transformation of the first, the configurational component is zero; if
+#' both dates contain the same values, the compositional component is zero.
+#'
+#' @examples
+#' z1 <- ss_simulate(60, 60, range = 6, seed = 1)
+#' z2 <- ss_simulate(60, 60, range = 12, seed = 2)
+#' ss_decompose_landscape(z1, z2, metrics = c("sq", "sr1", "gcon"))
+#' ss_decompose_landscape(z1, z2, fun = function(r)
+#'   c(moran = terra::autocor(r, method = "moran", global = TRUE)))
+#' @export
+ss_decompose_landscape <- function(z1, z2, metrics = NULL, fun = NULL,
+                                   range = NULL, nbins = 32L, nlevels = 16L,
+                                   lacbox = 3L) {
+  zz <- .ss_check_pair(z1, z2)
+  z1 <- zz$z1
+  z2 <- zz$z2
+  v1 <- terra::values(z1)[, 1]
+  v2 <- terra::values(z2)[, 1]
+  if (anyNA(v1)) {
+    stop("Landscape-level decomposition requires surfaces without missing ",
+         "values.", call. = FALSE)
+  }
+  if (!is.null(metrics) && !is.null(fun)) {
+    stop("Supply either `metrics` or `fun`, not both.", call. = FALSE)
+  }
+  if (is.null(fun) && is.null(metrics)) metrics <- ss_metric_list()$metric
+  c21 <- ss_rank_transfer(z2, z1)
+  c12 <- ss_rank_transfer(z1, z2)
+  if (is.null(fun)) {
+    ids <- .ss_metric_id(metrics)
+    if (is.null(range)) range <- range(c(v1, v2))
+    pars <- .ss_pars(z1, nbins, range, nlevels, lacbox)
+    ev <- function(r) {
+      out <- ss_whole_cpp(terra::values(r)[, 1], terra::nrow(r),
+                          terra::ncol(r), ids, 0L, pars)[1, ]
+      stats::setNames(out, metrics)
+    }
+  } else {
+    ev <- function(r) {
+      out <- fun(r)
+      if (!is.numeric(out)) stop("`fun` must return a numeric vector.",
+                                 call. = FALSE)
+      if (is.null(names(out))) names(out) <- paste0("V", seq_along(out))
+      out
+    }
+  }
+  M1 <- ev(z1)
+  M2 <- ev(z2)
+  MA <- ev(c21)
+  MB <- ev(c12)
+  comp <- 0.5 * ((M2 - MA) + (MB - M1))
+  conf <- 0.5 * ((MA - M1) + (M2 - MB))
+  data.frame(metric = names(M1), value1 = unname(M1), value2 = unname(M2),
+             total = unname(M2 - M1), composition = unname(comp),
+             configuration = unname(conf),
+             share_config = unname(abs(conf) / (abs(comp) + abs(conf))),
+             stringsAsFactors = FALSE)
 }

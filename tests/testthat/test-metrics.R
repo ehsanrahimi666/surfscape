@@ -96,7 +96,9 @@ test_that("block-wise processing is exact and NA handling is strict", {
 
 test_that("the metric catalogue is internally consistent", {
   info <- ss_metric_list()
-  expect_true(all(info$metric %in% names(formals(ss_metrics))[0] | TRUE))
+  expect_identical(info$binned, info$metric %in% c("sent", "srao", "slac",
+                                                   "gcon", "gdis", "ghom",
+                                                   "gasm", "gent", "gcor"))
   expect_error(ss_metrics(mk(), "nonsense"), "Unknown metric")
   expect_error(ss_metrics(mk(), "sq", w = 4), "odd")
   expect_equal(sum(info$arrangement), 10L)

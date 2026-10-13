@@ -1,35 +1,34 @@
 #' Catalogue of continuous landscape metrics
 #'
-#' Lists the metrics computed by the \pkg{surfscape} window kernel together with
-#' the property the decomposition framework depends on: whether a metric
-#' responds to the *arrangement* of values inside the analysis neighbourhood, or
-#' only to the *multiset* of values it contains.
+#' Lists the metrics computed by the \pkg{surfscape} window kernel with two
+#' properties that follow from their definitions: whether a metric depends on
+#' the positions of values inside the landscape window (`arrangement`), and
+#' whether it bins values on a value range (`binned`), which makes its
+#' response to changes in composition depend on how that range is set.
 #'
 #' @details
-#' A metric belongs to the **composition** family if permuting the values within
-#' a neighbourhood leaves it unchanged. Composition metrics can only ever
-#' measure what values are present, never how they are organised; no spatial
-#' rearrangement, however extreme, will move them. This is a property of the
-#' definition rather than of the data, and it can be verified for any metric,
-#' including metrics from other packages, with [ss_sensitivity()].
+#' A metric with `arrangement = FALSE` is a function of the set of values in
+#' the window only: rearranging the values inside the window leaves it
+#' unchanged, so it describes composition and cannot respond to configuration.
+#' This holds for the amplitude metrics of surface metrology (McGarigal et al.
+#' 2009) and for the information-theoretic measures, as noted by Frazier
+#' (2016) and Kedron et al. (2018). A metric with `arrangement = TRUE` can
+#' respond to configuration, but that does not make it insensitive to
+#' composition; [ss_benchmark()] measures both responses for any metric.
 #'
-#' Metrics belonging to the **configuration** family respond to arrangement and
-#' are therefore the only ones capable of detecting a change in spatial
-#' structure at a fixed value distribution.
-#'
-#' The amplitude family of surface metrics (Sa, Sq, Ssk, Sku, S10z) is aspatial,
-#' as noted in passing by McGarigal et al. (2009), Frazier and Wang (2016) and
-#' Kedron et al. (2018); so are the information-theoretic measures (Shannon
-#' entropy, Rao's quadratic entropy), because they are computed from the value
-#' distribution alone. The consequences of this for change detection are what
-#' [ss_decompose()] addresses.
-#'
-#' @return A `data.frame` with columns `metric`, `id`, `family`, `arrangement` and
-#'   `definition`.
+#' @return A `data.frame` with columns `metric`, `id`, `family`,
+#'   `arrangement`, `binned` and `definition`.
 #' @references
 #' McGarigal K, Tagil S, Cushman SA (2009) Surface metrics: an alternative to
 #' patch metrics for the quantification of landscape structure.
 #' *Landscape Ecology* 24:433-450.
+#'
+#' Frazier AE (2016) Surface metrics: scaling relationships and downscaling
+#' behavior. *Landscape Ecology* 31:351-363.
+#'
+#' Kedron PJ, Frazier AE, Ovando-Montejo GA, Wang J (2018) Surface metrics for
+#' landscape ecology: a comparison of landscape models across ecoregions and
+#' scales. *Landscape Ecology* 33:1489-1504.
 #'
 #' Haralick RM, Shanmugam K, Dinstein I (1973) Textural features for image
 #' classification. *IEEE Transactions on Systems, Man, and Cybernetics*
@@ -37,9 +36,13 @@
 #'
 #' Allain C, Cloitre M (1991) Characterizing the lacunarity of random and
 #' deterministic fractal sets. *Physical Review A* 44:3552-3558.
+#'
+#' Plotnick RE, Gardner RH, Hargrove WW, Prestegaard K, Perlmutter M (1996)
+#' Lacunarity analysis: a general technique for the analysis of spatial
+#' patterns. *Physical Review E* 53:5461-5468.
 #' @examples
 #' ss_metric_list()
-#' subset(ss_metric_list(), arrangement)     # configuration-sensitive only
+#' subset(ss_metric_list(), arrangement)
 #' @export
 ss_metric_list <- function() {
   data.frame(
@@ -52,6 +55,8 @@ ss_metric_list <- function() {
                "autocorrelation", rep("gradient", 2L), "lacunarity",
                rep("texture", 6L)),
     arrangement = c(rep(FALSE, 12L), rep(TRUE, 10L)),
+    binned = c(rep(FALSE, 10L), TRUE, TRUE, FALSE, FALSE, FALSE, TRUE,
+               rep(TRUE, 6L)),
     definition = c(
       "window mean",
       "average roughness, mean(|z - zbar|)",
@@ -63,12 +68,12 @@ ss_metric_list <- function() {
       "range, max(z) - min(z)",
       "ten-point height, mean of five highest minus five lowest",
       "coefficient of variation",
-      "Shannon entropy of binned values",
-      "Rao's quadratic entropy of binned values",
-      "Moran's I within the neighbourhood (rook adjacency)",
+      "Shannon entropy of values binned on the value range",
+      "Rao's quadratic entropy of values binned on the value range",
+      "lag-1 spatial autocorrelation, 1 - semivariance at lag 1 / variance (rook neighbours)",
       "root mean square surface slope",
       "developed interfacial area ratio",
-      "grey-scale gliding-box lacunarity",
+      "grey-scale gliding-box lacunarity (box mass measured from the lower end of the value range)",
       "GLCM contrast",
       "GLCM dissimilarity",
       "GLCM homogeneity",
@@ -94,12 +99,12 @@ ss_metric_list <- function() {
 
 #' Moving-window metrics for continuous landscape surfaces
 #'
-#' Computes continuous landscape metrics in a moving window. Every metric is
-#' derived from a single gather of each neighbourhood, and the neighbourhood is
-#' held as a two-dimensional patch so that configuration-sensitive metrics
-#' (within-window autocorrelation, slope, lacunarity, grey-level co-occurrence
-#' textures) are available alongside the aspatial amplitude and
-#' information-theoretic metrics.
+#' Computes continuous landscape metrics in a moving window. All metrics are
+#' computed from the same square landscape window around each cell, so that
+#' metrics that depend on the arrangement of values (lag-1 autocorrelation,
+#' slope, lacunarity, grey-level co-occurrence textures) and metrics that
+#' depend only on the values present (amplitude and information-theoretic
+#' metrics) describe exactly the same area.
 #'
 #' @param x A single-layer `SpatRaster`, or anything [terra::rast()] accepts.
 #' @param metrics Character vector of metric names; see [ss_metric_list()].
@@ -119,13 +124,15 @@ ss_metric_list <- function() {
 #'
 #' @section Relationship to other packages:
 #' \pkg{geodiv} implements a wider set of surface metrics, including the
-#' bearing-area, spectral and correlation-length families, and \pkg{GLCMTextures}
-#' implements grey-level co-occurrence textures with more options; both should
-#' be preferred when those specific metrics are the goal, and both can be passed
-#' to [ss_sensitivity()] as user functions. The kernel here exists because
-#' [ss_decompose()] must evaluate the same metric on counterfactual
-#' neighbourhoods that never exist as a raster and therefore cannot be handed to
-#' an external package.
+#' bearing-area, spectral and correlation-length families, \pkg{GLCMTextures}
+#' implements grey-level co-occurrence textures with more options, and
+#' [terra::autocor()] computes Moran's I and Geary's C. These should be
+#' preferred when those metrics are the goal, and any of them can be tested
+#' with [ss_benchmark()]. The metrics are reimplemented here only because
+#' [ss_decompose()] evaluates them on artificial windows created during the
+#' computation (for example, the values of one date in the arrangement of the
+#' other), which are not available as raster layers that could be passed to
+#' another package.
 #'
 #' @examples
 #' f <- system.file("extdata", "ndvi_2013.tif", package = "surfscape")

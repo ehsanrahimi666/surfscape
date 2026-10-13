@@ -10,20 +10,21 @@
  * Shared window-metric kernel.
  *
  * Every metric in surfscape is computed from a single w x w window held as a
- * dense row-major buffer. The same kernel is reused by three entry points:
- *   - ss_focal_metrics_cpp   : metric maps over a raster
- *   - ss_decompose_cpp       : within-window rank transfer and decomposition
- *   - ss_sensitivity_cpp     : permutation audit of configurational sensitivity
+ * dense row-major buffer. The same kernel is used by four entry points:
+ *   - ss_focal_metrics_cpp : metric maps over a raster
+ *   - ss_decompose_cpp     : within-window rank transfer and decomposition
+ *   - ss_permute_cpp       : metrics at sampled windows, observed and permuted
+ *   - ss_whole_cpp         : the whole raster as one window
  *
- * That reuse is not an optimisation, it is a requirement of the method: the
- * decomposition evaluates metrics on counterfactual windows that never exist
- * as a raster, so they cannot be passed to an external metric package.
+ * The decomposition evaluates metrics on counterfactual windows created in
+ * memory, which is why the metrics are computed here rather than by calling
+ * other packages.
  *
  * Metric ids
- *   composition family (functions of the window value multiset)
+ *   functions of the values in the window only
  *     1 smean  2 sa    3 sq    4 ssk   5 sku   6 sp    7 sv
  *     8 sz     9 s10z 10 scv  11 sent 12 srao
- *   configuration family (depend on the arrangement of values in the window)
+ *   depend on the arrangement of values in the window
  *    20 sr1   21 sdq  22 sdr  23 slac
  *    30 gcon  31 gdis 32 ghom 33 gasm 34 gent  35 gcor
  */
@@ -92,7 +93,8 @@ inline void ss_window_metrics(const double* buf, int wr, int wc,
     std::vector<double> h(nb, 0.0);
     for (int i = 0; i < k; ++i) {
       int b = (int) std::floor((buf[i] - p.gmin) / bw);
-      if (b < 0) b = 0; if (b >= nb) b = nb - 1;
+      if (b < 0) b = 0;
+      if (b >= nb) b = nb - 1;
       h[b] += 1.0;
     }
     double e = 0.0;
@@ -175,7 +177,8 @@ inline void ss_window_metrics(const double* buf, int wr, int wc,
     std::vector<int> q(k);
     for (int i = 0; i < k; ++i) {
       int b = (int) std::floor((buf[i] - p.gmin) / bw);
-      if (b < 0) b = 0; if (b >= L) b = L - 1;
+      if (b < 0) b = 0;
+      if (b >= L) b = L - 1;
       q[i] = b;
     }
     std::vector<double> P((size_t) L * L, 0.0);

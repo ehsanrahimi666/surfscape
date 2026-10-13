@@ -37,18 +37,23 @@ are returned alongside the summary.}
 \item{progress}{Logical, print progress.}
 }
 \value{
-A `data.frame` with one row per window size and metric, containing
-  the mean absolute magnitude of each component, the configurational share,
-  the correlation between components across cells, and the proportion of
-  cells where the sign of the total change differs from the sign of the
-  configurational change. When `rasters = TRUE`, a list with elements
-  `summary` and `rasters`.
+A `data.frame` with one row per window size and metric: `n`
+  (cells), the mean absolute value of the total change and of each
+  component (`mad_*`), `share_config`, the mean absolute configurational
+  component divided by the sum of the mean absolute values of the three
+  components, the correlations across cells between the compositional
+  (global plus local) and configurational components (`r_comp_config`) and
+  between the total change and the configurational component
+  (`r_total_config`), and `sign_disagree`, the proportion of cells with a
+  non-zero configurational component whose sign differs from that of the
+  total change. Correlations are `NA` when a component is constant, and
+  `sign_disagree` is `NA` when the configurational component is zero
+  everywhere. When `rasters = TRUE`, a list with elements `summary` and
+  `rasters`.
 }
 \description{
-Runs [ss_decompose()] over a ladder of window sizes and summarises how the
-three components of change scale. The scale at which the configurational
-component peaks answers a question the total change cannot: at what grain
-did the landscape actually rearrange.
+Runs [ss_decompose()] over a series of window sizes and summarises how the
+three components of change vary with the size of the landscape window.
 }
 \examples{
 set.seed(1)

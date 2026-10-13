@@ -45,9 +45,9 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// ss_sensitivity_cpp
-NumericMatrix ss_sensitivity_cpp(NumericVector z, int nrow, int ncol, int wr, int wc, IntegerVector mids, IntegerVector cells, int nperm, List pars);
-RcppExport SEXP _surfscape_ss_sensitivity_cpp(SEXP zSEXP, SEXP nrowSEXP, SEXP ncolSEXP, SEXP wrSEXP, SEXP wcSEXP, SEXP midsSEXP, SEXP cellsSEXP, SEXP npermSEXP, SEXP parsSEXP) {
+// ss_permute_cpp
+NumericMatrix ss_permute_cpp(NumericVector z, int nrow, int ncol, int wr, int wc, IntegerVector mids, IntegerVector cells, int nperm, List pars);
+RcppExport SEXP _surfscape_ss_permute_cpp(SEXP zSEXP, SEXP nrowSEXP, SEXP ncolSEXP, SEXP wrSEXP, SEXP wcSEXP, SEXP midsSEXP, SEXP cellsSEXP, SEXP npermSEXP, SEXP parsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -60,7 +60,23 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< IntegerVector >::type cells(cellsSEXP);
     Rcpp::traits::input_parameter< int >::type nperm(npermSEXP);
     Rcpp::traits::input_parameter< List >::type pars(parsSEXP);
-    rcpp_result_gen = Rcpp::wrap(ss_sensitivity_cpp(z, nrow, ncol, wr, wc, mids, cells, nperm, pars));
+    rcpp_result_gen = Rcpp::wrap(ss_permute_cpp(z, nrow, ncol, wr, wc, mids, cells, nperm, pars));
+    return rcpp_result_gen;
+END_RCPP
+}
+// ss_whole_cpp
+NumericMatrix ss_whole_cpp(NumericVector z, int nrow, int ncol, IntegerVector mids, int nperm, List pars);
+RcppExport SEXP _surfscape_ss_whole_cpp(SEXP zSEXP, SEXP nrowSEXP, SEXP ncolSEXP, SEXP midsSEXP, SEXP npermSEXP, SEXP parsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type z(zSEXP);
+    Rcpp::traits::input_parameter< int >::type nrow(nrowSEXP);
+    Rcpp::traits::input_parameter< int >::type ncol(ncolSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type mids(midsSEXP);
+    Rcpp::traits::input_parameter< int >::type nperm(npermSEXP);
+    Rcpp::traits::input_parameter< List >::type pars(parsSEXP);
+    rcpp_result_gen = Rcpp::wrap(ss_whole_cpp(z, nrow, ncol, mids, nperm, pars));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -68,7 +84,8 @@ END_RCPP
 static const R_CallMethodDef CallEntries[] = {
     {"_surfscape_ss_focal_metrics_cpp", (DL_FUNC) &_surfscape_ss_focal_metrics_cpp, 7},
     {"_surfscape_ss_decompose_cpp", (DL_FUNC) &_surfscape_ss_decompose_cpp, 8},
-    {"_surfscape_ss_sensitivity_cpp", (DL_FUNC) &_surfscape_ss_sensitivity_cpp, 9},
+    {"_surfscape_ss_permute_cpp", (DL_FUNC) &_surfscape_ss_permute_cpp, 9},
+    {"_surfscape_ss_whole_cpp", (DL_FUNC) &_surfscape_ss_whole_cpp, 6},
     {NULL, NULL, 0}
 };
 

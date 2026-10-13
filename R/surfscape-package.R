@@ -1,22 +1,27 @@
-#' surfscape: decomposing structural change in continuous landscapes
+#' surfscape: composition and configuration in continuous landscapes
 #'
-#' Landscape ecology distinguishes composition from configuration, but the
-#' continuous (gradient) representation of landscapes lost that distinction:
-#' most metrics applied to continuous surfaces are functions of the value
-#' distribution alone and are mathematically incapable of responding to how
-#' those values are arranged in space. \pkg{surfscape} makes the distinction
-#' explicit again.
+#' Tools to test whether a continuous landscape metric responds to the values
+#' present in a landscape window (composition), to their spatial arrangement
+#' (configuration), or to both, and to separate the compositional and
+#' configurational parts of an observed change between two dates.
 #'
 #' @section Main functions:
 #' \describe{
-#'   \item{\code{\link{ss_decompose}}}{split change between two dates into
-#'     distributional, redistributional and configurational components}
-#'   \item{\code{\link{ss_sensitivity}}}{audit whether a metric can see spatial
-#'     arrangement, and how much it does}
-#'   \item{\code{\link{ss_scale_profile}}}{how the components scale}
-#'   \item{\code{\link{ss_extract}}}{decomposed change in buffers around sites}
-#'   \item{\code{\link{ss_metrics}}}{the underlying moving-window engine}
-#'   \item{\code{\link{ss_rank_transfer}}}{counterfactual surface construction}
+#'   \item{\code{\link{ss_benchmark}}}{responses of any metric to controlled
+#'     changes of composition and configuration, and its classification}
+#'   \item{\code{\link{ss_perturb}}}{the controlled changes used by the
+#'     benchmark}
+#'   \item{\code{\link{ss_simulate}}}{continuous neutral landscapes with known
+#'     spatial structure}
+#'   \item{\code{\link{ss_decompose}}}{split the change between two dates
+#'     into global compositional, local compositional and configurational
+#'     components}
+#'   \item{\code{\link{ss_scale_profile}}}{the decomposition across window
+#'     sizes}
+#'   \item{\code{\link{ss_extract}}}{decomposed change in buffers around
+#'     sites}
+#'   \item{\code{\link{ss_metrics}}}{moving-window metric maps}
+#'   \item{\code{\link{ss_rank_transfer}}}{counterfactual surfaces}
 #' }
 #'
 #' @useDynLib surfscape, .registration = TRUE

@@ -44,36 +44,51 @@ A `SpatRaster` with one layer per metric and component, named
   `<metric>_<component>`.
 }
 \description{
-Splits the change in any continuous landscape metric between two dates into
-three additive components: a shift in the landscape-wide value distribution,
-a spatial redistribution of values among neighbourhoods, and a rearrangement
-of values within neighbourhoods. The three components sum exactly to the
-observed change at every cell.
+Splits the change in a moving-window landscape metric between two dates
+into three additive components: a change in the landscape-wide value
+distribution, a redistribution of values among landscape windows, and a
+rearrangement of values within windows. The three components sum to the
+observed change at every cell, up to floating-point rounding.
 }
 \section{The decomposition}{
 
-Let \eqn{M} be a metric evaluated on a neighbourhood, \eqn{W_1} and
-\eqn{W_2} the neighbourhood at the two dates, and let \eqn{A} denote the
-rank transfer that keeps one arrangement and substitutes the other value
-multiset. Symmetrising over the two possible orderings (the two-factor
-Shapley solution) gives
+For every window, the change in a metric between the two dates is split
+into three parts that add up to the total change:
+\describe{
+  \item{global}{the part due to the change in the landscape-wide value
+    distribution;}
+  \item{local}{the part due to values moving between windows, so that a
+    window contains a different set of values even when the landscape-wide
+    distribution is unchanged;}
+  \item{config}{the part due to the rearrangement of values inside the
+    window.}
+}
+The components are obtained from counterfactual surfaces built by rank
+transfer (see [ss_rank_transfer()]), which keeps the spatial ordering of
+values of one date and gives it the values of the other date. Inside each
+window, rank transfer between the two dated windows separates the change
+due to the window's values (marginal part) from the change due to their
+arrangement (`config`). Over the whole landscape, rank transfer between the
+two dated surfaces gives the change due to the landscape-wide distribution
+(`global`), and `local` is the marginal part minus `global`. Each
+counterfactual comparison is averaged over the two possible orderings of
+the dates (the two-factor Shapley value), so the result does not depend on
+which date is taken first; where composition and configuration change
+together, their interaction is shared equally between the components.
+The formulas are given in the package vignette.
 
-\deqn{\Delta M = \underbrace{\Delta_{\mathrm{global}}}_{\text{distribution}}
- + \underbrace{\Delta_{\mathrm{local}}}_{\text{redistribution}}
- + \underbrace{\Delta_{\mathrm{config}}}_{\text{arrangement}}}
+Two limiting cases follow exactly from this construction. If the second
+date is a strictly increasing transformation of the first, the spatial
+ordering of values is unchanged everywhere and the `config` and `local`
+components are zero. If the two dates contain the same values in a
+different arrangement, the landscape-wide distribution is unchanged and
+the `global` component is zero, while the `local` and `config`
+components are generally not zero because values have moved between and
+within windows.
 
-where the arrangement component is obtained by transferring ranks *within*
-each window, the global component by transferring ranks over the *whole*
-landscape, and the local component as the remainder. The identity holds
-exactly, not approximately: if the two dates differ only by a monotone
-transformation of values the arrangement and local components are exactly
-zero, and if they share an identical value multiset the global component is
-exactly zero.
-
-For every metric with `arrangement = FALSE` in [ss_metric_list()] the
-configurational component is exactly zero by construction, at every scale.
-That is the point: such metrics cannot detect spatial rearrangement, however
-large it is.
+For a metric that depends only on the values present in the window (a
+compositional metric, see [ss_benchmark()]) the `config` component is zero
+at every cell and at every window size.
 }
 
 \examples{
@@ -88,6 +103,6 @@ d <- ss_decompose(z1, z2, metrics = c("sq", "sr1"), w = 7)
 names(d)
 }
 \seealso{
-[ss_sensitivity()] to audit a metric before using it,
+[ss_benchmark()] to classify a metric before using it,
   [ss_scale_profile()] to run the decomposition across scales.
 }

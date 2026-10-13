@@ -44,23 +44,25 @@ A `SpatRaster` with one layer per requested metric, in the order
   given by `metrics`.
 }
 \description{
-Computes continuous landscape metrics in a moving window. Every metric is
-derived from a single gather of each neighbourhood, and the neighbourhood is
-held as a two-dimensional patch so that configuration-sensitive metrics
-(within-window autocorrelation, slope, lacunarity, grey-level co-occurrence
-textures) are available alongside the aspatial amplitude and
-information-theoretic metrics.
+Computes continuous landscape metrics in a moving window. All metrics are
+computed from the same square landscape window around each cell, so that
+metrics that depend on the arrangement of values (lag-1 autocorrelation,
+slope, lacunarity, grey-level co-occurrence textures) and metrics that
+depend only on the values present (amplitude and information-theoretic
+metrics) describe exactly the same area.
 }
 \section{Relationship to other packages}{
 
 \pkg{geodiv} implements a wider set of surface metrics, including the
-bearing-area, spectral and correlation-length families, and \pkg{GLCMTextures}
-implements grey-level co-occurrence textures with more options; both should
-be preferred when those specific metrics are the goal, and both can be passed
-to [ss_sensitivity()] as user functions. The kernel here exists because
-[ss_decompose()] must evaluate the same metric on counterfactual
-neighbourhoods that never exist as a raster and therefore cannot be handed to
-an external package.
+bearing-area, spectral and correlation-length families, \pkg{GLCMTextures}
+implements grey-level co-occurrence textures with more options, and
+[terra::autocor()] computes Moran's I and Geary's C. These should be
+preferred when those metrics are the goal, and any of them can be tested
+with [ss_benchmark()]. The metrics are reimplemented here only because
+[ss_decompose()] evaluates them on artificial windows created during the
+computation (for example, the values of one date in the arrangement of the
+other), which are not available as raster layers that could be passed to
+another package.
 }
 
 \examples{

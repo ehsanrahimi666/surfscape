@@ -7,42 +7,41 @@
 ss_metric_list()
 }
 \value{
-A `data.frame` with columns `metric`, `id`, `family`, `arrangement` and
-  `definition`.
+A `data.frame` with columns `metric`, `id`, `family`,
+  `arrangement`, `binned` and `definition`.
 }
 \description{
-Lists the metrics computed by the \pkg{surfscape} window kernel together with
-the property the decomposition framework depends on: whether a metric
-responds to the *arrangement* of values inside the analysis neighbourhood, or
-only to the *multiset* of values it contains.
+Lists the metrics computed by the \pkg{surfscape} window kernel with two
+properties that follow from their definitions: whether a metric depends on
+the positions of values inside the landscape window (`arrangement`), and
+whether it bins values on a value range (`binned`), which makes its
+response to changes in composition depend on how that range is set.
 }
 \details{
-A metric belongs to the **composition** family if permuting the values within
-a neighbourhood leaves it unchanged. Composition metrics can only ever
-measure what values are present, never how they are organised; no spatial
-rearrangement, however extreme, will move them. This is a property of the
-definition rather than of the data, and it can be verified for any metric,
-including metrics from other packages, with [ss_sensitivity()].
-
-Metrics belonging to the **configuration** family respond to arrangement and
-are therefore the only ones capable of detecting a change in spatial
-structure at a fixed value distribution.
-
-The amplitude family of surface metrics (Sa, Sq, Ssk, Sku, S10z) is aspatial,
-as noted in passing by McGarigal et al. (2009), Frazier and Wang (2016) and
-Kedron et al. (2018); so are the information-theoretic measures (Shannon
-entropy, Rao's quadratic entropy), because they are computed from the value
-distribution alone. The consequences of this for change detection are what
-[ss_decompose()] addresses.
+A metric with `arrangement = FALSE` is a function of the set of values in
+the window only: rearranging the values inside the window leaves it
+unchanged, so it describes composition and cannot respond to configuration.
+This holds for the amplitude metrics of surface metrology (McGarigal et al.
+2009) and for the information-theoretic measures, as noted by Frazier
+(2016) and Kedron et al. (2018). A metric with `arrangement = TRUE` can
+respond to configuration, but that does not make it insensitive to
+composition; [ss_benchmark()] measures both responses for any metric.
 }
 \examples{
 ss_metric_list()
-subset(ss_metric_list(), arrangement)     # configuration-sensitive only
+subset(ss_metric_list(), arrangement)
 }
 \references{
 McGarigal K, Tagil S, Cushman SA (2009) Surface metrics: an alternative to
 patch metrics for the quantification of landscape structure.
 *Landscape Ecology* 24:433-450.
+
+Frazier AE (2016) Surface metrics: scaling relationships and downscaling
+behavior. *Landscape Ecology* 31:351-363.
+
+Kedron PJ, Frazier AE, Ovando-Montejo GA, Wang J (2018) Surface metrics for
+landscape ecology: a comparison of landscape models across ecoregions and
+scales. *Landscape Ecology* 33:1489-1504.
 
 Haralick RM, Shanmugam K, Dinstein I (1973) Textural features for image
 classification. *IEEE Transactions on Systems, Man, and Cybernetics*
@@ -50,4 +49,8 @@ classification. *IEEE Transactions on Systems, Man, and Cybernetics*
 
 Allain C, Cloitre M (1991) Characterizing the lacunarity of random and
 deterministic fractal sets. *Physical Review A* 44:3552-3558.
+
+Plotnick RE, Gardner RH, Hargrove WW, Prestegaard K, Perlmutter M (1996)
+Lacunarity analysis: a general technique for the analysis of spatial
+patterns. *Physical Review E* 53:5461-5468.
 }

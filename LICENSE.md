@@ -1,6 +1,6 @@
 # GNU General Public License, version 3
 
-surfscape: Continuous Landscape Structure and Its Change Through Time
+surfscape: Composition and Configuration in Continuous Landscape Surfaces
 
 Copyright (C) 2026 Ehsan Rahimi and Chuleui Jung
 

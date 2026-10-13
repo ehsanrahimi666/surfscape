@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+title: "surfscape: Composition and Configuration in Continuous Landscape Surfaces"
+message: "If you use this software, please cite both the software and the paper."
+type: software
+authors:
+  - family-names: Rahimi
+    given-names: Ehsan
+  - family-names: Jung
+    given-names: Chuleui
+version: 0.3.0
+license: GPL-3.0
+repository-code: "https://github.com/ehsanrahimi666/surfscape"
+abstract: >-
+  An R package to test whether continuous landscape metrics respond to the
+  values present in a landscape window (composition), to their spatial
+  arrangement (configuration), or to both, using controlled changes and
+  simulated landscapes, and to decompose the change in a metric between two
+  dates into compositional and configurational components.
+keywords:
+  - landscape ecology
+  - landscape metrics
+  - gradient surface model
+  - composition
+  - configuration

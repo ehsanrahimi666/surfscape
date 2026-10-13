@@ -9,7 +9,11 @@ ss_decompose_cpp <- function(z1, z2, nrow, ncol, wr, wc, mids, pars) {
     .Call(`_surfscape_ss_decompose_cpp`, z1, z2, nrow, ncol, wr, wc, mids, pars)
 }
 
-ss_sensitivity_cpp <- function(z, nrow, ncol, wr, wc, mids, cells, nperm, pars) {
-    .Call(`_surfscape_ss_sensitivity_cpp`, z, nrow, ncol, wr, wc, mids, cells, nperm, pars)
+ss_permute_cpp <- function(z, nrow, ncol, wr, wc, mids, cells, nperm, pars) {
+    .Call(`_surfscape_ss_permute_cpp`, z, nrow, ncol, wr, wc, mids, cells, nperm, pars)
+}
+
+ss_whole_cpp <- function(z, nrow, ncol, mids, nperm, pars) {
+    .Call(`_surfscape_ss_whole_cpp`, z, nrow, ncol, mids, nperm, pars)
 }
 
